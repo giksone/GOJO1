@@ -2,44 +2,61 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = "python-devops-app:latest"
+        IMAGE_NAME = "python-devops-app:latest"
     }
 
     stages {
-        stage('Checkout') {
+
+        stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/giksone/python-devops-project.git'
+                git branch: 'main',
+                    url: 'https://github.com/giksone/GOJO1.git'
+            }
+        }
+
+        stage('Use Minikube Docker') {
+            steps {
+                sh '''
+                eval $(minikube docker-env)
+                docker info | grep Name
+                '''
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh 'eval $(minikube docker-env)'
-                sh 'docker build -t $DOCKER_IMAGE .'
+                sh '''
+                eval $(minikube docker-env)
+                docker build -t python-devops-app:latest .
+                '''
             }
         }
 
         stage('Deploy to Kubernetes') {
             steps {
-                sh 'kubectl apply -f deployment.yaml'
-                sh 'kubectl apply -f service.yaml'
+                sh '''
+                kubectl apply -f deployment.yaml
+                kubectl apply -f service.yaml
+                '''
             }
         }
 
-        stage('Check Pods') {
+        stage('Check Status') {
             steps {
-                sh 'kubectl get pods'
-                sh 'kubectl get services'
+                sh '''
+                kubectl get pods
+                kubectl get services
+                '''
             }
         }
     }
 
     post {
         success {
-            echo "Pipeline terminé ✅"
+            echo "✅ CI/CD terminé avec succès"
         }
         failure {
-            echo "Pipeline échoué ❌"
+            echo "❌ Erreur dans le pipeline"
         }
     }
 }
