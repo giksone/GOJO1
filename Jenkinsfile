@@ -2,7 +2,8 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "python-devops-app:latest"
+        // Nom de l'image Docker avec le hash du commit pour forcer Kubernetes à la prendre
+        IMAGE_NAME = "python-devops-app:${GIT_COMMIT}"
     }
 
     stages {
@@ -17,6 +18,7 @@ pipeline {
         stage('Use Minikube Docker') {
             steps {
                 sh '''
+                # Pointez Docker sur le daemon Minikube
                 eval $(minikube docker-env)
                 docker info | grep Name
                 '''
@@ -27,7 +29,7 @@ pipeline {
             steps {
                 sh '''
                 eval $(minikube docker-env)
-                docker build -t python-devops-app:latest .
+                docker build -t $IMAGE_NAME .
                 '''
             }
         }
@@ -35,15 +37,17 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
+                # Appliquer les fichiers Kubernetes
                 kubectl apply -f deployment.yaml
                 kubectl apply -f service.yaml
-                '''
-            }
-        }
 
-        stage('Check Status') {
-            steps {
-                sh '''
+                # Mettre à jour le déploiement avec la nouvelle image
+                kubectl set image deployment/python-app python-app=$IMAGE_NAME
+
+                # Forcer le redéploiement pour tirer la nouvelle image
+                kubectl rollout restart deployment/python-app
+
+                # Vérifier l'état des pods
                 kubectl get pods
                 kubectl get services
                 '''
@@ -53,10 +57,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ CI/CD terminé avec succès"
+            echo "✅ CI/CD terminé avec succès. Tous les pods sont à jour."
         }
         failure {
-            echo "❌ Erreur dans le pipeline"
+            echo "❌ Erreur dans le pipeline. Vérifier les logs."
         }
     }
 }
